@@ -1,13 +1,20 @@
 var Mon = function() {
-  this.distance = 250;
+  this.state = "Appear";
+  this.invisibleFlag = false;
+  this.rotation = 0;
+  this.distance = 1000;
 
-  this.container = new createjs.Container();
+  this.distanceFarLimit = 500;
+  this.distanceNearLimit = 50;
+
+  this.invisibleTimer;
+  this.displayFlag;
 
   this.imgMonL = new createjs.Bitmap('image/left.png');
   this.imgMonR = new createjs.Bitmap('image/right.png');
 
-  this.container.addChild(this.imgMonL);
-  this.container.addChild(this.imgMonR);
+  stage.addChild(this.imgMonL);
+  stage.addChild(this.imgMonR);
 
   this.imgMonL.regX = 128;
   this.imgMonL.regY = 128;
@@ -19,43 +26,147 @@ var Mon = function() {
   this.imgMonR.x = stage.canvas.width - 128;
   this.imgMonR.y = 128;
 
-  this.container.setBounds.x = 1920;
-  this.container.setBounds.y = 256;
+  this.colliderL = new createjs.Shape();
+  this.colliderL.graphics.beginFill("DarkRed");
+  this.colliderL.graphics.moveTo(-35, -110);
+  this.colliderL.graphics.lineTo(35, -110);
+  this.colliderL.graphics.lineTo(35, 60);
+  this.colliderL.graphics.lineTo(-35, 60);
+  this.colliderL.graphics.lineTo(-35, -110);
+  this.colliderL.alpha = 0;
 
-  this.container.regX = 960;
-  this.container.regY = 128;
+  this.colliderR = new createjs.Shape();
+  this.colliderR.graphics.beginFill("DarkRed");
+  this.colliderR.graphics.moveTo(-35, -110);
+  this.colliderR.graphics.lineTo(35, -110);
+  this.colliderR.graphics.lineTo(35, 60);
+  this.colliderR.graphics.lineTo(-35, 60);
+  this.colliderR.graphics.lineTo(-35, -110);
+  this.colliderR.alpha = 0;
 
-  this.container.x = stage.canvas.width / 2;
-  this.container.y = stage.canvas.height / 2;
+  stage.addChild(this.colliderL);
+  stage.addChild(this.colliderR);
 
-  createjs.Sound.registerSound('sound/approach.wav', 'approach');
+  this.indicator = new createjs.Text("", "60px DIN", "Grey");
+  stage.addChild(this.indicator);
+
+}
+
+Mon.prototype.title = function() {
+  this.state = "Title";
+  this.rotation = 0;
+  this.imgMonL.rotation = 0;
+  this.imgMonR.rotation = 0;
+  this.distance = 50;
+}
+
+Mon.prototype.start = function() {
+  this.state = "Start";
+  this.rotation = 0;
+}
+
+Mon.prototype.reset = function() {
+  this.state = "Appear";
+  this.invisibleFlag = true;
+  this.rotation = 0;
+  this.imgMonL.rotation = 0;
+  this.imgMonR.rotation = 0;
+  this.distance = 1000;
 }
 
 Mon.prototype.update = function() {
-  // 門をマウスで操作する
-  this.container.rotation = Math.atan2(stage.mouseY - stage.canvas.height / 2, stage.mouseX - stage.canvas.width / 2) * 180 / Math.PI;
-
-  if(keyFlag[83]) {
-    this.approach();
+  // 角度差の計算
+  var diff;
+  if((Math.abs(hi.img.rotation - this.rotation) % 360) < 180) {
+    diff = Math.abs(hi.img.rotation - this.rotation) % 360;
   }
-  else if(keyFlag[68]) {
-    this.deviate();
+  else {
+    diff = 360 - Math.abs(hi.img.rotation - this.rotation) % 360; 
+  }
+  
+  if(this.state === "Title") {
+    
+  }
+  else if(this.state === "Start") {
+    this.distance += 20;
+    if(this.distance > 1500) {
+      hi.reset();
+      this,reset();
+    }
+  }
+  else if(this.state === "Normal") {
+    // 門をマウスで操作する
+    this.rotation = Math.atan2(stage.mouseY - stage.canvas.height / 2, stage.mouseX - stage.canvas.width / 2) * 180 / Math.PI;
+    this.imgMonL.rotation = this.imgMonR.rotation = this.rotation;
+
+    if(keyFlag[83]) {
+      this.approach();
+    }
+    else if(keyFlag[68]) {
+      this.deviate();
+    }
+
+    this.indicator.text = Math.floor(diff);
+
+    // 門と日の距離を補正
+    if(this.distance > this.distanceFarLimit) this.distance = this.distanceFarLimit;
+    else if(this.distance < this.distanceNearLimit) {
+      this.distance = this.distanceNearLimit;
+
+      if(diff < 15) this.fit();
+      else this.hit();
+    }
+  }
+  else if(this.state === "Appear") {
+    this.rotation = 0;
+    this.distance -= 10;
+    if(this.distance < this.distanceFarLimit) {
+      this.distance = this.distanceFarLimit;
+      this.invisibleTimer = 80;
+      this.state = "Normal";
+    };
+  }
+  else if(this.state === "Freeze") {
+    
+  }
+  else if(this.state === "Hit") {
+    this.distance += 20;
+    this.imgMonL.rotation += 30;
+    this.imgMonR.rotation += 30;
   }
 
-  // 門と日の距離を補正
-  if(this.distance > 500) this.distance = 500;
+  // 無敵
+  if(this.invisibleFlag) {
+    if(this.displayFlag) {
+      this.displayFlag = false;
+      this.imgMonL.alpha = this.imgMonR.alpha = 0.6;
+    }
+    else {
+      this.displayFlag = true;
+      this.imgMonL.alpha = this.imgMonR.alpha = 0.2;
+    }
 
-  else if(this.distance < 50) {
-    this.distance = 50;
-
-    if(Math.abs(hi.img.rotation + 360 - (this.container.rotation % 360) % 360 < 15 )) console.log("OK!");
-    else hi.hit();
+    this.invisibleTimer--;
+    if(this.invisibleTimer < 0) {
+      this.imgMonL.alpha = this.imgMonR.alpha = 1;
+      this.invisibleFlag = false;
+    }
   }
 
-  this.imgMonL.x = stage.canvas.width / 2 - this.distance;
-  this.imgMonL.y = 128;
-  this.imgMonR.x = stage.canvas.width / 2 + this.distance;
-  this.imgMonR.y = 128;
+  let radian = this.rotation / 180 * Math.PI;
+
+  this.imgMonL.x = -this.distance * Math.cos(radian) + stage.canvas.width / 2;
+  this.imgMonL.y = -this.distance * Math.sin(radian) + stage.canvas.height / 2;
+  this.imgMonR.x = this.distance * Math.cos(radian) + stage.canvas.width / 2;
+  this.imgMonR.y = this.distance * Math.sin(radian) + stage.canvas.height / 2;
+
+  this.colliderL.x = this.imgMonL.x;
+  this.colliderL.y = this.imgMonL.y;
+  this.colliderR.x = this.imgMonR.x;
+  this.colliderR.y = this.imgMonR.y;
+
+  this.colliderL.rotation = this.imgMonL.rotation;
+  this.colliderR.rotation = this.imgMonR.rotation;
 }
 
 Mon.prototype.approach = function() {
@@ -64,4 +175,24 @@ Mon.prototype.approach = function() {
 
 Mon.prototype.deviate = function() {
   this.distance += 10;
+}
+
+Mon.prototype.fit = function() {
+  this.state = "Freeze";
+  hi.fit();
+  createjs.Sound.play('fit');
+  showDictionary("ma");
+}
+
+Mon.prototype.hit = function() {
+  this.state = "Freeze";
+  hi.hit();
+  createjs.Sound.play('hit');
+  showDictionary("mon");
+}
+
+Mon.prototype.damage = function() {
+  this.state = "Hit";
+  createjs.Sound.play('damage');
+  showDictionary("hi");
 }

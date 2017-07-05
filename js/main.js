@@ -47,7 +47,7 @@ function initialize() {
   createjs.Sound.registerSound('sound/hit.mp3', 'hit');
   createjs.Sound.registerSound('sound/shot.mp3', 'shot');
   createjs.Sound.registerSound('sound/start.mp3', 'start');
-  
+
   title();
 
   stage.update();
